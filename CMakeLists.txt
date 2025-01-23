@@ -17,5 +17,5 @@ pybind11_add_module(stara_cpp
 # Include directories
 target_include_directories(stara_cpp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Install the module
-install(TARGETS stara_cpp DESTINATION .) 
+# Install the module into the Python package directory
+install(TARGETS stara_cpp DESTINATION stara_cpp) 
