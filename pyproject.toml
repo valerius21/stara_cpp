@@ -19,7 +19,7 @@ numpy = "^1.26.3"
 
 [project]
 name = "stara-cpp"
-version = "0.1.0"
+version = "0.1.1"
 description = "A* pathfinding algorithm implementation in C++"
 authors = [
     { name = "Valerius Mattfeld", email = "mail@valerius.me" }

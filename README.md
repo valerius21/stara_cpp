@@ -2,6 +2,12 @@
 
 A C++ implementation of the A\* pathfinding algorithm with Python bindings using pybind11.
 
+## Installation
+
+```bash
+pip install stara-cpp
+```
+
 ## Requirements
 
 - Python 3.12 or higher
@@ -10,7 +16,7 @@ A C++ implementation of the A\* pathfinding algorithm with Python bindings using
 - Poetry (for Python dependency management)
 - numpy
 
-## Installation
+## Development
 
 1. Clone the repository:
 
