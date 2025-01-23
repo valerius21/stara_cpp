@@ -15,13 +15,9 @@ def main():
         dtype=np.int32,
     )
 
-    # Load the maze into the C++ implementation
     maze_ptr = load_maze(maze)
-
-    # Create A* pathfinder
     pathfinder = AStar(maze_ptr)
 
-    # Find a path from (0,0) to (4,4)
     start = (0, 0)
     goal = (4, 4)
 

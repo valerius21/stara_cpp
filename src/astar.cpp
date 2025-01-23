@@ -1,94 +1,93 @@
 #include "astar.hpp"
-
+#include <algorithm>
+#include <iostream>
 std::pair<int, int> AStar::getLowestFScoreNode(
     const std::unordered_map<std::pair<int, int>, int, PairHash>& fScores,
     const std::unordered_set<std::pair<int, int>, PairHash>& openSet
 ) {
-    auto minIt = openSet.begin();
-    int minScore = fScores.at(*minIt);
-
-    for (auto it = std::next(openSet.begin()); it != openSet.end(); ++it) {
-        int score = fScores.at(*it);
-        if (score < minScore) {
-            minScore = score;
-            minIt = it;
-        }
+    if (openSet.empty()) {
+        throw std::runtime_error("Cannot get lowest f-score from empty set");
     }
-    return *minIt;
+
+    return *std::min_element(
+        openSet.begin(), 
+        openSet.end(),
+        [&fScores](const auto& a, const auto& b) {
+            return fScores.at(a) < fScores.at(b);
+        }
+    );
 }
 
 std::optional<std::vector<std::pair<int, int>>> AStar::findPath(
     const std::pair<int, int>& start,
     const std::pair<int, int>& goal
 ) {
-    // Track actual distance from start to each node
+    // Pre-allocate containers with reasonable initial sizes
     std::unordered_map<std::pair<int, int>, int, PairHash> gScores;
+    gScores.reserve(maze_.getWidth() * maze_.getHeight());
     gScores[start] = 0;
 
-    // Track estimated total distance through each node
     std::unordered_map<std::pair<int, int>, int, PairHash> fScores;
+    fScores.reserve(maze_.getWidth() * maze_.getHeight());
     fScores[start] = manhattanDistance(start, goal);
 
-    // For path reconstruction
     std::unordered_map<std::pair<int, int>, std::pair<int, int>, PairHash> cameFrom;
+    cameFrom.reserve(maze_.getWidth() * maze_.getHeight());
 
-    // Set of nodes to evaluate
     std::unordered_set<std::pair<int, int>, PairHash> openSet;
+    openSet.reserve(maze_.getWidth() * maze_.getHeight());
     openSet.insert(start);
 
-    // Keep track of visited nodes
     std::unordered_set<std::pair<int, int>, PairHash> closedSet;
+    closedSet.reserve(maze_.getWidth() * maze_.getHeight());
 
-    while (!openSet.empty()) {
-        // Get node with lowest f_score
-        auto currentPos = getLowestFScoreNode(fScores, openSet);
-        openSet.erase(currentPos);
+    try {
+        while (!openSet.empty()) {
+            auto currentPos = getLowestFScoreNode(fScores, openSet);
+            openSet.erase(currentPos);
 
-        if (closedSet.find(currentPos) != closedSet.end()) {
-            continue;
-        }
-
-        // If we reached the goal, reconstruct and return the path
-        if (currentPos == goal) {
-            std::vector<std::pair<int, int>> path;
-            auto current = currentPos;
-            while (cameFrom.find(current) != cameFrom.end()) {
-                path.push_back(current);
-                current = cameFrom[current];
-            }
-            path.push_back(start);
-            std::reverse(path.begin(), path.end());
-            return path;
-        }
-
-        closedSet.insert(currentPos);
-
-        // Check all neighbors
-        auto neighbors = maze_.getCellNeighbours(currentPos.first, currentPos.second);
-        for (const auto& next : neighbors) {
-            auto nextPos = std::make_pair(std::get<0>(next), std::get<1>(next));
-            int value = std::get<2>(next);
-
-            // Skip walls and already processed nodes
-            if (value == 0 || closedSet.find(nextPos) != closedSet.end()) {
+            if (closedSet.find(currentPos) != closedSet.end()) {
                 continue;
             }
 
-            // Calculate tentative g_score for this neighbor
-            // All edges have weight 1 in this implementation
-            int tentativeG = gScores[currentPos] + 1;
+            if (currentPos == goal) {
+                std::vector<std::pair<int, int>> path;
+                path.reserve(gScores[currentPos]); // Reserve space for the expected path length
+                auto current = currentPos;
+                while (cameFrom.find(current) != cameFrom.end()) {
+                    path.push_back(current);
+                    current = cameFrom[current];
+                }
+                path.push_back(start);
+                std::reverse(path.begin(), path.end());
+                return path;
+            }
 
-            // If we found a better path to this neighbor
-            if (gScores.find(nextPos) == gScores.end() || tentativeG < gScores[nextPos]) {
-                // Update the path
-                cameFrom[nextPos] = currentPos;
-                gScores[nextPos] = tentativeG;
-                fScores[nextPos] = tentativeG + manhattanDistance(nextPos, goal);
-                openSet.insert(nextPos);
+            closedSet.insert(currentPos);
+
+            auto neighbors = maze_.getCellNeighbours(currentPos.first, currentPos.second);
+            for (const auto& next : neighbors) {
+                auto nextPos = std::make_pair(std::get<0>(next), std::get<1>(next));
+                int value = std::get<2>(next);
+
+                if (value == 0 || closedSet.find(nextPos) != closedSet.end()) {
+                    continue;
+                }
+
+                int tentativeG = gScores[currentPos] + 1;
+
+                if (gScores.find(nextPos) == gScores.end() || tentativeG < gScores[nextPos]) {
+                    cameFrom[nextPos] = currentPos;
+                    gScores[nextPos] = tentativeG;
+                    fScores[nextPos] = tentativeG + manhattanDistance(nextPos, goal);
+                    openSet.insert(nextPos);
+                }
             }
         }
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return std::nullopt;
     }
 
-    // If we get here, no path exists
     return std::nullopt;
 } 
