@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "stara-cpp"
-version = "0.1.0"
+version = "0.1.2"
 description = "A* pathfinding algorithm implementation in C++"
 authors = ["Valerius Mattfeld <mail@valerius.me>"]
 readme = "README.md"
@@ -14,7 +14,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.12.8"
 numpy = "^1.26.3"
 
 [project]
