@@ -2,8 +2,10 @@
 #include <vector>
 #include <queue>
 #include <unordered_set>
+#include <unordered_map>
 #include <cmath>
 #include <memory>
+#include <optional>
 
 class Maze {
 public:
@@ -20,6 +22,22 @@ public:
         return isValid(x, y) && grid_[y][x] >= 1;
     }
 
+    std::vector<std::tuple<int, int, int>> getCellNeighbours(int x, int y) const {
+        std::vector<std::tuple<int, int, int>> neighbours;
+        const std::vector<std::pair<int, int>> directions = {
+            {0, 1}, {1, 0}, {0, -1}, {-1, 0}  // Only cardinal directions like in Python version
+        };
+
+        for (const auto& dir : directions) {
+            int newX = x + dir.first;
+            int newY = y + dir.second;
+            if (isValid(newX, newY)) {
+                neighbours.emplace_back(newX, newY, grid_[newY][newX]);
+            }
+        }
+        return neighbours;
+    }
+
     int getWidth() const { return width_; }
     int getHeight() const { return height_; }
 
@@ -29,29 +47,34 @@ private:
     int height_;
 };
 
-struct Node {
-    int x, y;
-    double g_cost;  // Cost from start to current node
-    double h_cost;  // Heuristic cost from current node to goal
-    std::shared_ptr<Node> parent;
+class AStar {
+public:
+    // Hash function for pair
+    struct PairHash {
+        template <class T1, class T2>
+        std::size_t operator()(const std::pair<T1, T2>& p) const {
+            auto h1 = std::hash<T1>{}(p.first);
+            auto h2 = std::hash<T2>{}(p.second);
+            return h1 ^ (h2 << 1);
+        }
+    };
 
-    Node(int x, int y) : x(x), y(y), g_cost(0), h_cost(0), parent(nullptr) {}
+    explicit AStar(const Maze& maze) : maze_(maze) {}
 
-    double f_cost() const { return g_cost + h_cost; }
-
-    bool operator==(const Node& other) const {
-        return x == other.x && y == other.y;
+    static int manhattanDistance(const std::pair<int, int>& pos1, const std::pair<int, int>& pos2) {
+        return std::abs(pos1.first - pos2.first) + std::abs(pos1.second - pos2.second);
     }
-};
 
-struct NodeCompare {
-    bool operator()(const std::shared_ptr<Node>& a, const std::shared_ptr<Node>& b) const {
-        return a->f_cost() > b->f_cost();
-    }
-};
+    static std::pair<int, int> getLowestFScoreNode(
+        const std::unordered_map<std::pair<int, int>, int, PairHash>& fScores,
+        const std::unordered_set<std::pair<int, int>, PairHash>& openSet
+    );
 
-std::vector<std::pair<int, int>> findPath(
-    const Maze& maze,
-    std::pair<int, int> start,
-    std::pair<int, int> goal
-); 
+    std::optional<std::vector<std::pair<int, int>>> findPath(
+        const std::pair<int, int>& start,
+        const std::pair<int, int>& goal
+    );
+
+private:
+    const Maze& maze_;
+}; 

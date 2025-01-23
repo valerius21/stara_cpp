@@ -1,80 +1,94 @@
 #include "astar.hpp"
 
-namespace {
-    double heuristic(int x1, int y1, int x2, int y2) {
-        return std::sqrt(std::pow(x2 - x1, 2) + std::pow(y2 - y1, 2));
+std::pair<int, int> AStar::getLowestFScoreNode(
+    const std::unordered_map<std::pair<int, int>, int, PairHash>& fScores,
+    const std::unordered_set<std::pair<int, int>, PairHash>& openSet
+) {
+    auto minIt = openSet.begin();
+    int minScore = fScores.at(*minIt);
+
+    for (auto it = std::next(openSet.begin()); it != openSet.end(); ++it) {
+        int score = fScores.at(*it);
+        if (score < minScore) {
+            minScore = score;
+            minIt = it;
+        }
     }
-
-    struct NodeHash {
-        std::size_t operator()(const std::shared_ptr<Node>& node) const {
-            return std::hash<int>()(node->x) ^ (std::hash<int>()(node->y) << 1);
-        }
-    };
-
-    struct NodeEqual {
-        bool operator()(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs) const {
-            return *lhs == *rhs;
-        }
-    };
+    return *minIt;
 }
 
-std::vector<std::pair<int, int>> findPath(
-    const Maze& maze,
-    std::pair<int, int> start,
-    std::pair<int, int> goal
+std::optional<std::vector<std::pair<int, int>>> AStar::findPath(
+    const std::pair<int, int>& start,
+    const std::pair<int, int>& goal
 ) {
-    const std::vector<std::pair<int, int>> directions = {
-        {0, 1}, {1, 0}, {0, -1}, {-1, 0},  // Cardinal directions
-        {1, 1}, {1, -1}, {-1, 1}, {-1, -1}  // Diagonal directions
-    };
+    // Track actual distance from start to each node
+    std::unordered_map<std::pair<int, int>, int, PairHash> gScores;
+    gScores[start] = 0;
 
-    std::priority_queue<std::shared_ptr<Node>, std::vector<std::shared_ptr<Node>>, NodeCompare> openSet;
-    std::unordered_set<std::shared_ptr<Node>, NodeHash, NodeEqual> closedSet;
+    // Track estimated total distance through each node
+    std::unordered_map<std::pair<int, int>, int, PairHash> fScores;
+    fScores[start] = manhattanDistance(start, goal);
 
-    auto startNode = std::make_shared<Node>(start.first, start.second);
-    startNode->h_cost = heuristic(start.first, start.second, goal.first, goal.second);
-    openSet.push(startNode);
+    // For path reconstruction
+    std::unordered_map<std::pair<int, int>, std::pair<int, int>, PairHash> cameFrom;
+
+    // Set of nodes to evaluate
+    std::unordered_set<std::pair<int, int>, PairHash> openSet;
+    openSet.insert(start);
+
+    // Keep track of visited nodes
+    std::unordered_set<std::pair<int, int>, PairHash> closedSet;
 
     while (!openSet.empty()) {
-        auto current = openSet.top();
-        openSet.pop();
+        // Get node with lowest f_score
+        auto currentPos = getLowestFScoreNode(fScores, openSet);
+        openSet.erase(currentPos);
 
-        if (current->x == goal.first && current->y == goal.second) {
-            // Path found, reconstruct it
+        if (closedSet.find(currentPos) != closedSet.end()) {
+            continue;
+        }
+
+        // If we reached the goal, reconstruct and return the path
+        if (currentPos == goal) {
             std::vector<std::pair<int, int>> path;
-            auto node = current;
-            while (node != nullptr) {
-                path.emplace_back(node->x, node->y);
-                node = node->parent;
+            auto current = currentPos;
+            while (cameFrom.find(current) != cameFrom.end()) {
+                path.push_back(current);
+                current = cameFrom[current];
             }
+            path.push_back(start);
             std::reverse(path.begin(), path.end());
             return path;
         }
 
-        closedSet.insert(current);
+        closedSet.insert(currentPos);
 
-        for (const auto& dir : directions) {
-            int newX = current->x + dir.first;
-            int newY = current->y + dir.second;
+        // Check all neighbors
+        auto neighbors = maze_.getCellNeighbours(currentPos.first, currentPos.second);
+        for (const auto& next : neighbors) {
+            auto nextPos = std::make_pair(std::get<0>(next), std::get<1>(next));
+            int value = std::get<2>(next);
 
-            if (!maze.isWalkable(newX, newY)) {
+            // Skip walls and already processed nodes
+            if (value == 0 || closedSet.find(nextPos) != closedSet.end()) {
                 continue;
             }
 
-            auto neighbor = std::make_shared<Node>(newX, newY);
-            if (closedSet.find(neighbor) != closedSet.end()) {
-                continue;
+            // Calculate tentative g_score for this neighbor
+            // All edges have weight 1 in this implementation
+            int tentativeG = gScores[currentPos] + 1;
+
+            // If we found a better path to this neighbor
+            if (gScores.find(nextPos) == gScores.end() || tentativeG < gScores[nextPos]) {
+                // Update the path
+                cameFrom[nextPos] = currentPos;
+                gScores[nextPos] = tentativeG;
+                fScores[nextPos] = tentativeG + manhattanDistance(nextPos, goal);
+                openSet.insert(nextPos);
             }
-
-            double moveCost = (dir.first != 0 && dir.second != 0) ? 1.414 : 1.0;
-            double tentative_g_cost = current->g_cost + moveCost;
-
-            neighbor->g_cost = tentative_g_cost;
-            neighbor->h_cost = heuristic(newX, newY, goal.first, goal.second);
-            neighbor->parent = current;
-            openSet.push(neighbor);
         }
     }
 
-    return {};  // No path found
+    // If we get here, no path exists
+    return std::nullopt;
 } 

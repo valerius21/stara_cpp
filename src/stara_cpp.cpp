@@ -25,7 +25,7 @@ std::shared_ptr<Maze> load_maze(py::array_t<int> array) {
     return std::make_shared<Maze>(grid);
 }
 
-std::vector<std::pair<int, int>> find_path_wrapper(
+std::optional<std::vector<std::pair<int, int>>> find_path_wrapper(
     std::shared_ptr<Maze> maze,
     std::pair<int, int> start,
     std::pair<int, int> goal
@@ -36,7 +36,9 @@ std::vector<std::pair<int, int>> find_path_wrapper(
     if (!maze->isWalkable(start.first, start.second) || !maze->isWalkable(goal.first, goal.second)) {
         throw std::runtime_error("Start or goal position is not walkable");
     }
-    return findPath(*maze, start, goal);
+
+    AStar pathfinder(*maze);
+    return pathfinder.findPath(start, goal);
 }
 
 PYBIND11_MODULE(stara_cpp, m) {
@@ -46,8 +48,14 @@ PYBIND11_MODULE(stara_cpp, m) {
         .def(py::init<const std::vector<std::vector<int>>&>())
         .def("is_valid", &Maze::isValid)
         .def("is_walkable", &Maze::isWalkable)
+        .def("get_cell_neighbours", &Maze::getCellNeighbours)
         .def("get_width", &Maze::getWidth)
         .def("get_height", &Maze::getHeight);
+
+    py::class_<AStar>(m, "AStar")
+        .def(py::init<const Maze&>())
+        .def("manhattan_distance", &AStar::manhattanDistance)
+        .def("find_path", &AStar::findPath);
 
     m.def("load_maze", &load_maze, "Load maze from numpy array",
           py::arg("array").noconvert());
